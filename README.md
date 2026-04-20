@@ -5,6 +5,9 @@ A lightweight **browser-based PDF tool** that lets you upload PDFs, select pages
 
 Everything runs **locally in your browser**, so your PDFs are never uploaded anywhere.
 
+<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/d5198ea2-98e4-4d07-a22c-bb7b60ee7a5e" />
+
+
 ---
 
 ## ✨ Features
