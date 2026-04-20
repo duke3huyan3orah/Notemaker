@@ -138,4 +138,4 @@ Your PDFs **are never uploaded or stored on any server**.
 
 ## 📜 License
 
-This project is released under the **MIT License**.
+This project is released under the **MIT License**(just a joke).
