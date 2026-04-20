@@ -1,0 +1,333 @@
+
+<h2 class="sr-only">PDF Note Maker – upload PDFs, pick pages, apply filters, and export a custom PDF</h2>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+.app{display:flex;flex-direction:column;min-height:520px}
+.toolbar{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:0.5px solid var(--color-border-tertiary);flex-wrap:wrap}
+.toolbar-title{font-size:15px;font-weight:500;color:var(--color-text-primary);flex:1;min-width:120px}
+.main{display:flex;flex:1;min-height:460px}
+.sidebar{width:210px;min-width:210px;padding:14px 12px;border-right:0.5px solid var(--color-border-tertiary);display:none;flex-direction:column;gap:14px;overflow-y:auto}
+.sec-label{font-size:10px;font-weight:500;color:var(--color-text-secondary);letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.rname{font-size:13px;color:var(--color-text-primary)}
+.toggle{position:relative;width:34px;height:19px;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0;position:absolute}
+.tslider{position:absolute;cursor:pointer;inset:0;background:var(--color-border-secondary);border-radius:19px;transition:.18s}
+.tslider:before{content:'';position:absolute;width:15px;height:15px;left:2px;bottom:2px;background:white;border-radius:50%;transition:.18s}
+.toggle input:checked+.tslider{background:#534AB7}
+.toggle input:checked+.tslider:before{transform:translateX(15px)}
+.srow{display:flex;flex-direction:column;gap:3px}
+.slabel-row{display:flex;justify-content:space-between}
+.sval{font-size:11px;color:var(--color-text-secondary);min-width:28px;text-align:right}
+.nup-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:2px}
+.nup-btn{padding:4px 2px;border:0.5px solid var(--color-border-tertiary);border-radius:6px;background:transparent;cursor:pointer;font-size:12px;color:var(--color-text-secondary);text-align:center;transition:.12s}
+.nup-btn.active{border-color:#534AB7;color:#534AB7;background:#EEEDFE}
+.content{flex:1;padding:14px;overflow-y:auto;min-width:0}
+.dropzone{border:1.5px dashed var(--color-border-secondary);border-radius:var(--border-radius-lg);padding:36px 16px;text-align:center;cursor:pointer;color:var(--color-text-secondary);font-size:14px;transition:.15s;margin-bottom:12px}
+.dropzone:hover,.dropzone.dragover{border-color:#534AB7;background:#EEEDFE;color:#534AB7}
+.dropzone.hidden{display:none}
+.dz-icon{font-size:28px;margin-bottom:8px;opacity:.45}
+.dz-main{font-weight:500;margin-bottom:4px;font-size:14px;color:var(--color-text-primary)}
+.dz-sub{font-size:12px;opacity:.65}
+.pages-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px}
+.page-card{border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);overflow:hidden;cursor:pointer;position:relative;transition:border .1s;background:var(--color-background-primary);user-select:none}
+.page-card:hover{border-color:var(--color-border-secondary)}
+.page-card.selected{border:2px solid #534AB7}
+.page-card.dragging{opacity:.35}
+.page-card.drag-over{border:2px dashed #7F77DD}
+.page-thumb{width:100%;display:block;background:#fff;transition:filter .2s}
+.page-info{padding:3px 6px;font-size:9px;color:var(--color-text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.page-num{position:absolute;top:4px;left:4px;background:rgba(0,0,0,.55);color:#fff;border-radius:3px;padding:1px 4px;font-size:9px;font-weight:500}
+.pcheck{position:absolute;top:4px;right:4px;width:16px;height:16px;border-radius:50%;background:white;border:0.5px solid var(--color-border-secondary);display:flex;align-items:center;justify-content:center}
+.page-card.selected .pcheck{background:#534AB7;border-color:#534AB7}
+.pcheck-dot{width:7px;height:7px;border-radius:50%;background:transparent}
+.page-card.selected .pcheck-dot{background:white}
+.progress{padding:6px 0;font-size:12px;color:var(--color-text-secondary)}
+.selinfo{font-size:11px;color:var(--color-text-secondary);margin-top:2px}
+.export-btn{background:#534AB7 !important;color:white !important;border-color:#534AB7 !important}
+.export-btn:hover{background:#3C3489 !important;border-color:#3C3489 !important}
+button:disabled{opacity:.5;cursor:not-allowed}
+</style>
+
+<div class="app">
+  <div class="toolbar">
+    <span class="toolbar-title">PDF Note Maker</span>
+    <input type="file" id="fileInput" accept=".pdf" multiple style="display:none">
+    <button onclick="document.getElementById('fileInput').click()">+ Add PDFs</button>
+    <button onclick="clearAll()" id="clearBtn" style="display:none">Clear all</button>
+    <button onclick="exportPDF()" id="exportBtn" class="export-btn" style="display:none">Export PDF</button>
+  </div>
+  <div class="main">
+    <div class="sidebar" id="sidebar">
+      <div>
+        <div class="sec-label">Color</div>
+        <div class="row" style="margin-bottom:6px"><span class="rname">Grayscale</span><label class="toggle"><input type="checkbox" id="grayscale" onchange="applyFilters()"><span class="tslider"></span></label></div>
+        <div class="row"><span class="rname">Invert</span><label class="toggle"><input type="checkbox" id="invert" onchange="applyFilters()"><span class="tslider"></span></label></div>
+      </div>
+      <div>
+        <div class="sec-label">Filters</div>
+        <div class="srow" style="margin-bottom:6px">
+          <div class="slabel-row"><span class="rname" style="font-size:12px">Brightness</span><span class="sval" id="bVal">100%</span></div>
+          <input type="range" id="brightness" min="30" max="200" value="100" step="1" oninput="applyFilters()">
+        </div>
+        <div class="srow" style="margin-bottom:6px">
+          <div class="slabel-row"><span class="rname" style="font-size:12px">Contrast</span><span class="sval" id="cVal">100%</span></div>
+          <input type="range" id="contrast" min="30" max="200" value="100" step="1" oninput="applyFilters()">
+        </div>
+        <div class="srow">
+          <div class="slabel-row"><span class="rname" style="font-size:12px">Saturation</span><span class="sval" id="sVal">100%</span></div>
+          <input type="range" id="saturate" min="0" max="200" value="100" step="1" oninput="applyFilters()">
+        </div>
+      </div>
+      <div>
+        <div class="sec-label">Layout</div>
+        <div style="font-size:11px;color:var(--color-text-secondary);margin-bottom:5px">Pages per sheet</div>
+        <div class="nup-grid">
+          <button class="nup-btn active" onclick="setNup(1,this)">1</button>
+          <button class="nup-btn" onclick="setNup(2,this)">2</button>
+          <button class="nup-btn" onclick="setNup(4,this)">4</button>
+          <button class="nup-btn" onclick="setNup(6,this)">6</button>
+        </div>
+        <div class="row" style="margin-top:8px"><span class="rname">Remove gaps</span><label class="toggle"><input type="checkbox" id="removeGaps"><span class="tslider"></span></label></div>
+      </div>
+      <div>
+        <div class="sec-label">Selection</div>
+        <button onclick="selectAll()" style="width:100%;margin-bottom:4px">Select all</button>
+        <button onclick="selectNone()" style="width:100%">Deselect all</button>
+        <div class="selinfo" id="selInfo"></div>
+      </div>
+    </div>
+    <div class="content">
+      <div class="dropzone" id="dropzone"
+        ondragover="dzOver(event)" ondrop="dzDrop(event)" ondragleave="dzLeave()"
+        onclick="document.getElementById('fileInput').click()">
+        <div class="dz-icon">⊕</div>
+        <div class="dz-main">Drop PDFs here or click to browse</div>
+        <div class="dz-sub">Add multiple PDF files to combine</div>
+      </div>
+      <div id="progressArea"></div>
+      <div id="pagesArea" style="display:none"><div class="pages-grid" id="pagesGrid"></div></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+const ST={pages:[],nUp:1,uid:0,drag:null};
+
+document.getElementById('fileInput').addEventListener('change',e=>{handleFiles(Array.from(e.target.files));e.target.value='';});
+function dzOver(e){e.preventDefault();document.getElementById('dropzone').classList.add('dragover');}
+function dzLeave(){document.getElementById('dropzone').classList.remove('dragover');}
+function dzDrop(e){e.preventDefault();dzLeave();handleFiles(Array.from(e.dataTransfer.files).filter(f=>f.name.toLowerCase().endsWith('.pdf')));}
+
+async function handleFiles(files){
+  if(!files.length)return;
+  for(const f of files){showProg('Loading: '+f.name+'...');await loadPDF(f);}
+  hideProg();renderGrid();showUI();
+}
+
+async function loadPDF(file){
+  const buf=await file.arrayBuffer();
+  const pdf=await pdfjsLib.getDocument({data:buf.slice()}).promise;
+  for(let i=1;i<=pdf.numPages;i++){
+    showProg('Reading '+file.name+': page '+i+'/'+pdf.numPages);
+    const pg=await pdf.getPage(i);
+    const vp=pg.getViewport({scale:1});
+    const sc=140/vp.width;
+    const tvp=pg.getViewport({scale:sc});
+    const tc=document.createElement('canvas');
+    tc.width=tvp.width;tc.height=tvp.height;
+    await pg.render({canvasContext:tc.getContext('2d'),viewport:tvp}).promise;
+    ST.pages.push({id:ST.uid++,fname:file.name.replace(/\.pdf$/i,''),pdfDoc:pdf,pageNum:i,total:pdf.numPages,thumb:tc,vw:vp.width,vh:vp.height,selected:true});
+  }
+}
+
+function getFilter(){
+  const g=document.getElementById('grayscale').checked;
+  const inv=document.getElementById('invert').checked;
+  const b=document.getElementById('brightness').value;
+  const c=document.getElementById('contrast').value;
+  const s=document.getElementById('saturate').value;
+  let f='';
+  if(g)f+='grayscale(1) ';
+  if(inv)f+='invert(1) ';
+  f+=`brightness(${b}%) contrast(${c}%) saturate(${s}%)`;
+  return f.trim();
+}
+
+function applyFilters(){
+  document.getElementById('bVal').textContent=document.getElementById('brightness').value+'%';
+  document.getElementById('cVal').textContent=document.getElementById('contrast').value+'%';
+  document.getElementById('sVal').textContent=document.getElementById('saturate').value+'%';
+  const f=getFilter();
+  document.querySelectorAll('.page-thumb').forEach(img=>img.style.filter=f);
+}
+
+function renderGrid(){
+  const grid=document.getElementById('pagesGrid');
+  grid.innerHTML='';
+  const f=getFilter();
+  ST.pages.forEach((p,idx)=>{
+    const card=document.createElement('div');
+    card.className='page-card'+(p.selected?' selected':'');
+    card.draggable=true;
+    card.addEventListener('click',()=>toggleSel(p.id));
+    card.addEventListener('dragstart',e=>startDrag(e,idx));
+    card.addEventListener('dragover',e=>overDrag(e,idx));
+    card.addEventListener('drop',e=>dropDrag(e,idx));
+    card.addEventListener('dragend',endDrag);
+
+    const img=document.createElement('img');
+    img.src=p.thumb.toDataURL('image/png');
+    img.className='page-thumb';
+    img.style.filter=f;
+
+    const num=document.createElement('div');
+    num.className='page-num';
+    num.textContent=p.pageNum+(p.total>1?'/'+p.total:'');
+
+    const chk=document.createElement('div');
+    chk.className='pcheck';
+    chk.innerHTML='<div class="pcheck-dot"></div>';
+
+    const info=document.createElement('div');
+    info.className='page-info';
+    info.title=p.fname;
+    info.textContent=p.fname;
+
+    card.append(img,num,chk,info);
+    grid.appendChild(card);
+  });
+  updateSelInfo();
+}
+
+function toggleSel(id){const p=ST.pages.find(x=>x.id===id);if(p){p.selected=!p.selected;renderGrid();}}
+function selectAll(){ST.pages.forEach(p=>p.selected=true);renderGrid();}
+function selectNone(){ST.pages.forEach(p=>p.selected=false);renderGrid();}
+function updateSelInfo(){const sel=ST.pages.filter(p=>p.selected).length;document.getElementById('selInfo').textContent=sel+' of '+ST.pages.length+' pages selected';}
+
+function startDrag(e,idx){ST.drag=idx;e.currentTarget.classList.add('dragging');e.dataTransfer.effectAllowed='move';}
+function overDrag(e,idx){e.preventDefault();e.dataTransfer.dropEffect='move';document.querySelectorAll('.page-card').forEach(c=>c.classList.remove('drag-over'));if(idx!==ST.drag)e.currentTarget.classList.add('drag-over');}
+function dropDrag(e,idx){e.preventDefault();if(ST.drag!==null&&idx!==ST.drag){const r=ST.pages.splice(ST.drag,1)[0];ST.pages.splice(idx,0,r);renderGrid();}ST.drag=null;}
+function endDrag(){ST.drag=null;document.querySelectorAll('.page-card').forEach(c=>c.classList.remove('dragging','drag-over'));}
+
+function setNup(n,btn){ST.nUp=n;document.querySelectorAll('.nup-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');}
+
+function showUI(){
+  const has=ST.pages.length>0;
+  document.getElementById('dropzone').classList.toggle('hidden',has);
+  document.getElementById('pagesArea').style.display=has?'block':'none';
+  document.getElementById('sidebar').style.display=has?'flex':'none';
+  document.getElementById('clearBtn').style.display=has?'':'none';
+  document.getElementById('exportBtn').style.display=has?'':'none';
+}
+
+function clearAll(){ST.pages=[];renderGrid();showUI();}
+function showProg(m){document.getElementById('progressArea').innerHTML='<div class="progress">'+m+'</div>';}
+function hideProg(){document.getElementById('progressArea').innerHTML='';}
+
+function autoCrop(canvas){
+  const ctx=canvas.getContext('2d'),d=ctx.getImageData(0,0,canvas.width,canvas.height).data;
+  const W=canvas.width,H=canvas.height,T=238;
+  let top=0,bot=H-1,lft=0,rgt=W-1;
+  lo:for(let y=0;y<H;y++){for(let x=0;x<W;x++){const i=(y*W+x)*4;if(d[i]<T||d[i+1]<T||d[i+2]<T){top=y;break lo;}}}
+  lo:for(let y=H-1;y>=top;y--){for(let x=0;x<W;x++){const i=(y*W+x)*4;if(d[i]<T||d[i+1]<T||d[i+2]<T){bot=y;break lo;}}}
+  lo:for(let x=0;x<W;x++){for(let y=top;y<=bot;y++){const i=(y*W+x)*4;if(d[i]<T||d[i+1]<T||d[i+2]<T){lft=x;break lo;}}}
+  lo:for(let x=W-1;x>=lft;x--){for(let y=top;y<=bot;y++){const i=(y*W+x)*4;if(d[i]<T||d[i+1]<T||d[i+2]<T){rgt=x;break lo;}}}
+  const w=rgt-lft+1,h=bot-top+1;
+  if(w<=0||h<=0)return canvas;
+  const c2=document.createElement('canvas');c2.width=w;c2.height=h;
+  c2.getContext('2d').drawImage(canvas,lft,top,w,h,0,0,w,h);
+  return c2;
+}
+
+function applyFilterCanvas(canvas){
+  const f=getFilter();
+  if(f==='brightness(100%) contrast(100%) saturate(100%)')return;
+  const t=document.createElement('canvas');t.width=canvas.width;t.height=canvas.height;
+  const ctx=t.getContext('2d');
+  // Convert percentages to decimals for canvas filter
+  const g=document.getElementById('grayscale').checked;
+  const inv=document.getElementById('invert').checked;
+  const b=document.getElementById('brightness').value;
+  const c=document.getElementById('contrast').value;
+  const s=document.getElementById('saturate').value;
+  let cf='';
+  if(g)cf+='grayscale(1) ';
+  if(inv)cf+='invert(1) ';
+  cf+=`brightness(${b/100}) contrast(${c/100}) saturate(${s/100})`;
+  ctx.filter=cf.trim();
+  ctx.drawImage(canvas,0,0);
+  canvas.getContext('2d').clearRect(0,0,canvas.width,canvas.height);
+  canvas.getContext('2d').drawImage(t,0,0);
+}
+
+function getNupGrid(n){
+  if(n===1)return{cols:1,rows:1};
+  if(n===2)return{cols:1,rows:2};
+  if(n===4)return{cols:2,rows:2};
+  return{cols:2,rows:3};
+}
+
+async function renderHiRes(p){
+  const pg=await p.pdfDoc.getPage(p.pageNum);
+  const vp=pg.getViewport({scale:2});
+  const c=document.createElement('canvas');c.width=vp.width;c.height=vp.height;
+  await pg.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
+  if(document.getElementById('removeGaps').checked)return autoCrop(c);
+  return c;
+}
+
+async function exportPDF(){
+  const btn=document.getElementById('exportBtn');
+  btn.textContent='Exporting...';btn.disabled=true;
+  try{
+    const sel=ST.pages.filter(p=>p.selected);
+    if(!sel.length){alert('Select at least one page first.');return;}
+    const{PDFDocument}=PDFLib;
+    const out=await PDFDocument.create();
+    const nUp=ST.nUp;
+    const A4W=595,A4H=842;
+    const gap=document.getElementById('removeGaps').checked?0:10;
+
+    for(let i=0;i<sel.length;i+=nUp){
+      const chunk=sel.slice(i,i+nUp);
+      const gr=getNupGrid(nUp);
+      const cW=A4W*2,cH=A4H*2;
+      const comp=document.createElement('canvas');comp.width=cW;comp.height=cH;
+      const ctx=comp.getContext('2d');
+      ctx.fillStyle='white';ctx.fillRect(0,0,cW,cH);
+      const cellW=cW/gr.cols,cellH=cH/gr.rows;
+
+      for(let j=0;j<chunk.length;j++){
+        const pc=await renderHiRes(chunk[j]);
+        const col=j%gr.cols,row=Math.floor(j/gr.cols);
+        const x=col*cellW,y=row*cellH;
+        const sx=(cellW-gap*2)/pc.width,sy=(cellH-gap*2)/pc.height;
+        const sc=Math.min(sx,sy);
+        const dw=pc.width*sc,dh=pc.height*sc;
+        const dx=x+(cellW-dw)/2,dy=y+(cellH-dh)/2;
+        ctx.drawImage(pc,dx,dy,dw,dh);
+      }
+      applyFilterCanvas(comp);
+
+      const imgData=comp.toDataURL('image/jpeg',0.93);
+      const b64=imgData.split(',')[1];
+      const bytes=Uint8Array.from(atob(b64),c=>c.charCodeAt(0));
+      const jpg=await out.embedJpg(bytes);
+      const pg=out.addPage([A4W,A4H]);
+      pg.drawImage(jpg,{x:0,y:0,width:A4W,height:A4H});
+    }
+
+    const pdfBytes=await out.save();
+    const blob=new Blob([pdfBytes],{type:'application/pdf'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');a.href=url;a.download='notes.pdf';
+    document.body.appendChild(a);a.click();
+    setTimeout(()=>{URL.revokeObjectURL(url);a.remove();},1500);
+  }catch(err){console.error(err);alert('Export error: '+err.message);}
+  finally{btn.textContent='Export PDF';btn.disabled=false;}
+}
+</script>
